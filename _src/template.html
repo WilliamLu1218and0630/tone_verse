@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>抑揚五步格 · 寫詩工具</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ButTaiwan/taipei-sans-tc-font/css/taipei-sans-tc.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* ============================== Variables ============================== */
+:root{
+  --bg:#faf8f3; --surface:#ffffff; --elevated:#f0ebe0;
+  --text:#1f1f24; --text-muted:#5a5a66;
+  --accent:#1e3a8a; --accent-hover:#1e40af; --border:#e5e0d3;
+  --qing:#b45309; --ping:#1e3a8a; --yun:#9d174d;
+  --ok:#15803d; --bad:#b91c1c; --anti:#9d174d;
+}
+/* ============================== Base & Typography ====================== */
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:'Taipei Sans TC Beta','Noto Sans TC',Georgia,'Times New Roman',serif;
+  line-height:1.5;
+}
+h1{font-size:1.2rem;margin:0;font-weight:700;letter-spacing:.02em}
+h2{font-size:.92rem;margin:0 0 .5rem;color:var(--text-muted);font-weight:500}
+button{font-family:inherit;cursor:pointer}
+select,input{font-family:inherit}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* ============================== Layout ================================ */
+.wrap{max-width:1180px;margin:0 auto;padding:1rem 1.2rem}
+.toolbar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;
+  padding:.7rem 1rem;background:var(--elevated);border:1px solid var(--border);
+  border-radius:8px;margin-bottom:1rem;
+}
+.toolbar .spacer{flex:1}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem}
+@media(max-width:860px){.cols{grid-template-columns:1fr}}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:1.1rem;box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.03);
+}
+.btn{
+  padding:.32rem .75rem;border:1px solid var(--border);background:var(--surface);
+  border-radius:6px;font-size:.83rem;color:var(--text);transition:all .15s ease;
+}
+.btn:hover{filter:brightness(1.05);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.sm{padding:.18rem .5rem;font-size:.76rem}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.seg button{padding:.3rem .7rem;border:none;background:var(--surface);font-size:.8rem;color:var(--text-muted);border-right:1px solid var(--border)}
+.seg button:last-child{border-right:none}
+.seg button.on{background:var(--qing);color:#fff}
+/* ============================== Poem grid ============================ */
+.legend{display:flex;gap:.9rem;font-size:.76rem;color:var(--text-muted);margin-bottom:.7rem;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:.3rem}
+.dot{width:.65rem;height:.65rem;border-radius:50%;display:inline-block}
+.poem{display:flex;flex-direction:column;gap:.5rem}
+.line{display:flex;gap:.28rem;align-items:flex-start}
+.line-no{width:1.2rem;text-align:right;color:var(--text-muted);font-size:.75rem;padding-top:.85rem;flex-shrink:0}
+.cell{display:flex;flex-direction:column;align-items:center;gap:1px}
+.cell input{
+  width:2.3rem;height:2.3rem;text-align:center;font-size:1.35rem;
+  border:1.5px solid var(--border);border-radius:6px;background:var(--surface);
+  color:var(--text);font-family:inherit;transition:all .12s ease;padding:0;
+}
+.cell input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(30,58,138,.14)}
+.cell.active input{border-color:var(--accent);box-shadow:0 0 0 2px rgba(30,58,138,.14)}
+.cell.t-qing input{border-bottom:2.5px solid var(--qing)}
+.cell.t-ping input{border-bottom:2.5px solid var(--ping)}
+.cell.t-yun  input{border-bottom:2.5px solid var(--yun)}
+.cell input.ok{background:#f0fdf4}
+.cell input.bad{background:#fef2f2;color:var(--bad)}
+.cell input.unknown{background:#fefce8}
+.cell .tag{font-size:.58rem;color:var(--text-muted)}
+.cell.t-qing .tag{color:var(--qing)} .cell.t-ping .tag{color:var(--ping)} .cell.t-yun .tag{color:var(--yun)}
+.rhyme-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.8rem;font-size:.82rem}
+.chip{padding:.2rem .55rem;border-radius:999px;border:1px solid var(--border);background:var(--elevated);font-size:.78rem}
+.hint{font-size:.76rem;color:var(--text-muted);margin-top:.5rem;line-height:1.5}
+/* ============================== Lookup (right) ====================== */
+.subtabs{display:flex;gap:.3rem;margin-bottom:.7rem}
+.subtab{padding:.3rem .8rem;border:1px solid var(--border);background:var(--surface);border-radius:6px;font-size:.85rem;color:var(--text-muted);transition:all .15s ease}
+.subtab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ctrl{display:flex;flex-wrap:wrap;gap:.5rem .8rem;align-items:center;margin-bottom:.6rem;font-size:.82rem}
+.tone-checks{display:flex;gap:.3rem;flex-wrap:wrap}
+.tone-checks .tc{padding:.22rem .55rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:.8rem;color:var(--text-muted);user-select:none}
+.tone-checks .tc.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.toggle{display:inline-flex;align-items:center;gap:.3rem;user-select:none;cursor:pointer}
+.seed-in{padding:.25rem .5rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);width:11rem;min-width:11rem}
+.basis{font-size:.74rem;color:var(--text-muted);margin-bottom:.5rem;min-height:1em}
+.panel-ctx{font-size:.88rem;margin-bottom:.5rem}
+.panel-ctx b{color:var(--accent)}
+.cnt{font-size:.76rem;color:var(--text-muted)}
+.cands{display:flex;flex-wrap:wrap;gap:.2rem;max-height:52vh;overflow-y:auto;align-content:flex-start}
+.cand{
+  position:relative;display:inline-flex;flex-direction:row;align-items:center;justify-content:center;
+  gap:.12rem;width:3rem;height:2.6rem;padding:.15rem .12rem;border:1px solid var(--border);border-radius:6px;
+  background:var(--surface);transition:all .12s ease;line-height:1.05;
+}
+.cand:hover{border-color:var(--accent);transform:translateY(-1px);background:#f7faff}
+.cand.anti{border-color:var(--anti);background:#fdf2f7}
+.cand .ch{font-size:1.3rem;line-height:1}
+.cand .zy{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;font-size:.5rem;line-height:1.05;color:var(--text-muted)}
+.cand .zy .zc{display:block}                       /* 咬字符號：直排，各一行 */
+.cand .zy .neutral{display:block;line-height:.7}   /* 輕聲˙：置頂 */
+.cand .zy .zy-last{position:relative;display:block;line-height:1}            /* 末符號＝注音主體，置中對齊上方各符號 */
+.cand .zy .zy-last .tn{position:absolute;left:100%;top:-.15em;font-size:.82em;line-height:1;margin-left:.02em}  /* 調號：絕對掛右上，不撐版面、不推主體 */
+.cand .badge{position:absolute;top:-6px;right:-6px;font-size:.55rem;background:var(--anti);color:#fff;border-radius:999px;padding:0 .25rem}
+.cand.word{width:auto;min-width:3rem;height:2.6rem;padding:.15rem .3rem;gap:.26rem}
+.cand.word .wch{display:inline-flex;flex-direction:row;align-items:center;gap:.16rem}
+.empty{color:var(--text-muted);font-size:.88rem;padding:1rem 0}
+/* ============================== Settings dropdown =================== */
+.settings-wrap{position:relative}
+.settings-menu{
+  display:none;position:absolute;top:calc(100% + 6px);right:0;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:.7rem .9rem;box-shadow:0 4px 14px rgba(0,0,0,.1);
+  z-index:100;white-space:nowrap;
+}
+.settings-menu.open{display:block}
+.settings-menu .srow{display:flex;align-items:center;gap:.6rem;font-size:.82rem;color:var(--text-muted)}
+/* ============================== Read view ========================== */
+.poem-read{
+  display:none;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:3rem;margin-bottom:1rem;
+}
+.poem-read.show{display:block}
+.line-text{font-size:2rem;line-height:2;letter-spacing:.2em;color:var(--text)}
+.read-hint{font-size:.78rem;color:var(--text-muted);margin-top:1.5rem}
+.stat-line{font-size:.74rem;color:var(--text-muted);margin-top:.4rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- ============================== Toolbar ============================== -->
+  <div class="toolbar">
+    <h1>抑揚五步格</h1>
+    <span style="font-size:.8rem;color:var(--text-muted)">四句·每句十字</span>
+    <div class="spacer"></div>
+    <button class="btn" id="btn-read" onclick="toggleRead()">清讀</button>
+    <div class="settings-wrap">
+      <button class="btn" id="btn-settings" onclick="toggleSettings(event)">設定</button>
+      <div class="settings-menu" id="settings-menu" onclick="event.stopPropagation()">
+        <div class="srow">
+          <span>輕位模式</span>
+          <div class="seg" id="lightmode">
+            <button data-m="three" class="on" onclick="setLight('three')">三聲</button>
+            <button data-m="qing" onclick="setLight('qing')">輕聲</button>
+            <button data-m="both" onclick="setLight('both')">皆含</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button class="btn" onclick="exportJSON()">匯出</button>
+    <button class="btn" onclick="document.getElementById('imp').click()">匯入</button>
+    <input type="file" id="imp" accept=".json" style="display:none">
+    <button class="btn" onclick="clearPoem()">清空</button>
+  </div>
+
+  <div id="poem-read" class="poem-read"></div>
+  <div class="cols" id="cols">
+    <!-- ============================== LEFT: 寫詩區 ===================== -->
+    <div class="card">
+      <h2>寫詩區</h2>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--qing)"></i>1·3·5·7·9 = <b id="lg-light">三聲</b></span>
+        <span><i class="dot" style="background:var(--ping)"></i>2·4·6·8 = 一聲</span>
+        <span><i class="dot" style="background:var(--yun)"></i>第10字 = 四聲韻腳</span>
+      </div>
+      <div class="poem" id="poem"></div>
+      <div class="rhyme-row" id="rhyme-row"></div>
+      <div class="stat-line" id="stat-line"></div>
+      <div class="hint">點格子→右側出候選字。可直接打字手動輸入；違律標紅但不刪除，作家最終決定權。填字後自動跳下一格。</div>
+    </div>
+
+    <!-- ============================== RIGHT: 查字區 ==================== -->
+    <div class="card">
+      <h2>查字區</h2>
+      <div class="subtabs">
+        <button class="subtab active" id="st-pro" onclick="setLookup('pro')">作家版</button>
+        <button class="subtab" id="st-easy" onclick="setLookup('easy')">偷懶版</button>
+      </div>
+      <div class="panel-ctx" id="panel-ctx">點左側任一格開始</div>
+
+      <!-- 聲調過濾（兩版共用） -->
+      <div class="ctrl">
+        <span style="color:var(--text-muted)">聲調</span>
+        <div class="tone-checks" id="tone-checks">
+          <span class="tc" data-t="1">一</span><span class="tc" data-t="2">二</span>
+          <span class="tc" data-t="3">三</span><span class="tc" data-t="4">四</span>
+          <span class="tc" data-t="5">輕</span>
+        </div>
+        <button class="btn sm" onclick="meterToCell()" title="回到目前格子的格律聲調（未選格則取第一格）">依格律</button>
+      </div>
+
+      <!-- 偷懶版專屬控制 -->
+      <div id="easy-ctrl" style="display:none">
+        <div class="ctrl">
+          <label class="toggle"><input type="checkbox" id="tg-word" onchange="renderLookup()">詞語</label>
+          <span id="wlen-wrap" style="display:none">字數
+            <select id="wlen" onchange="renderLookup()" style="padding:.2rem .35rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)">
+              <option value="0">全部</option><option value="2">2 字</option><option value="3">3 字</option><option value="4">4 字</option><option value="5">5+ 字</option>
+            </select>
+          </span>
+          <label class="toggle"><input type="checkbox" id="tg-yun" checked onchange="renderLookup()">押尾韻</label>
+          <label class="toggle"><input type="checkbox" id="tg-tou" onchange="renderLookup()">押頭韻</label>
+          <label class="toggle"><input type="checkbox" id="tg-sem" checked onchange="renderLookup()">語意排序</label>
+          <span style="color:var(--text-muted)">參考依據</span>
+          <input class="seed-in" id="seed" placeholder="字／詞，留空依當行" oninput="renderLookup()">
+        </div>
+        <div class="basis" id="basis"></div>
+      </div>
+
+      <div class="cnt" id="lk-cnt" style="margin-bottom:.4rem"></div>
+      <div class="cands" id="cands"><div class="empty">尚未選格。點左側格子，或直接用聲調篩選瀏覽。</div></div>
+    </div>
+  </div>
+</div>
+
+<script id="db" type="application/json">/*__DB__*/</script>
+<script id="emb" type="application/json">/*__EMB__*/</script>
+<script id="anto" type="application/json">/*__ANTO__*/</script>
+<script id="words" type="application/json">/*__WORDS__*/</script>
+<script>
+// ============================== Constants ==============================
+const DB=JSON.parse(document.getElementById('db').textContent);
+const CHARS=DB.chars;                       // [{c,f,z,t,sm,y}] 依 f 由高到低
+const IDX=new Map(CHARS.map((e,i)=>[e.c,i]));
+const BY_TONE={1:[],2:[],3:[],4:[],5:[]};
+CHARS.forEach(e=>BY_TONE[e.t].push(e));
+const TONE_NAME={1:'一聲',2:'二聲',3:'三聲',4:'四聲',5:'輕聲'};
+const ZY_TONES=new Set(['ˊ','ˇ','ˋ','˙']);
+function splitZy(z){const last=z.slice(-1);return ZY_TONES.has(last)?[z.slice(0,-1),last]:[z,''];}
+const LINES=4,COLS=10;
+const SK={state:'tone_verse_v2_state'};
+// 反義表 -> Map char -> Set(反義字)
+const ANTO=(function(){
+  const m=new Map();
+  try{JSON.parse(document.getElementById('anto').textContent).forEach(([a,b])=>{
+    if(!m.has(a))m.set(a,new Set()); m.get(a).add(b);
+    if(!m.has(b))m.set(b,new Set()); m.get(b).add(a);
+  });}catch(e){}
+  return m;
+})();
+// 字向量（int8）
+const EMB=(function(){
+  try{
+    const o=JSON.parse(document.getElementById('emb').textContent);
+    if(!o.b64)return null;
+    const bin=atob(o.b64); const a=new Int8Array(bin.length);
+    for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i)<<24>>24;
+    const norms=new Float32Array(o.count);
+    for(let i=0;i<o.count;i++){let s=0;const off=i*o.dim;for(let d=0;d<o.dim;d++){const v=a[off+d];s+=v*v;}norms[i]=Math.sqrt(s)||1;}
+    return {dim:o.dim,count:o.count,data:a,norms};
+  }catch(e){return null;}
+})();
+// 詞庫（純詞字串陣列，已按詞頻排序；聲調/注音 runtime 從單字庫推）
+const WORDS=(function(){try{return JSON.parse(document.getElementById('words').textContent).words||[];}catch(e){return[];}})();
+
+// ============================== State =================================
+function defaultState(){return{poem:Array.from({length:LINES},()=>Array(COLS).fill('')),source:Array.from({length:LINES},()=>Array(COLS).fill('')),light:'three',rhyme:'',lookup:'pro'};}
+let S=loadState();
+let active=null;                 // {line,pos} 1-based pos
+let toneFilter=new Set();        // 目前聲調過濾（手動可改）
+
+// ============================== Storage ===============================
+function loadState(){try{const r=localStorage.getItem(SK.state);if(r){const s=JSON.parse(r);if(s.poem&&s.poem.length===LINES)return Object.assign(defaultState(),s);}}catch(e){console.warn(e)}return defaultState();}
+function saveState(){try{localStorage.setItem(SK.state,JSON.stringify(S))}catch(e){console.warn(e)}}
+window.addEventListener('beforeunload',saveState);
+
+// ============================== Tone rule =============================
+function requiredTones(pos){
+  if(pos===10)return[4];
+  if(pos%2===0)return[1];
+  if(S.light==='three')return[3];
+  if(S.light==='qing')return[5];
+  return[3,5];
+}
+function posClass(pos){return pos===10?'t-yun':(pos%2===0?'t-ping':'t-qing');}
+function posTag(pos){return pos===10?'韻':(pos%2===0?'平':'輕');}
+function validateChar(ch,pos){if(!ch)return'';const e=CHARS[IDX.get(ch)];if(e===undefined||!IDX.has(ch))return'unknown';return requiredTones(pos).includes(CHARS[IDX.get(ch)].t)?'ok':'bad';}
+
+// ============================== Poem render ===========================
+function renderPoem(){
+  const root=document.getElementById('poem');root.innerHTML='';
+  for(let l=0;l<LINES;l++){
+    const row=document.createElement('div');row.className='line';
+    const no=document.createElement('div');no.className='line-no';no.textContent=(l+1);row.appendChild(no);
+    for(let p=1;p<=COLS;p++){
+      const cell=document.createElement('div');cell.className='cell '+posClass(p);
+      if(active&&active.line===l&&active.pos===p)cell.classList.add('active');
+      const inp=document.createElement('input');inp.value=S.poem[l][p-1]||'';
+      inp.className=validateChar(inp.value,p);inp.dataset.line=l;inp.dataset.pos=p;
+      inp.addEventListener('focus',()=>{active={line:l,pos:p};resetToneToCell();markActive();renderLookup();});
+      inp.addEventListener('input',e=>{if(e.isComposing)return;onInput(e,l,p);});
+      inp.addEventListener('compositionend',e=>onInput(e,l,p));
+      inp.addEventListener('keydown',e=>{
+        if(e.isComposing)return;
+        if(e.key==='Backspace'&&!e.target.value){e.preventDefault();focusPrev(l,p);return;}
+        if(e.key==='ArrowRight'){e.preventDefault();focusCell(l,p+1);}
+        else if(e.key==='ArrowLeft'){e.preventDefault();focusCell(l,p-1);}
+        else if(e.key==='ArrowDown'){e.preventDefault();focusCell(l+1,p);}
+        else if(e.key==='ArrowUp'){e.preventDefault();focusCell(l-1,p);}
+      });
+      const tag=document.createElement('div');tag.className='tag';tag.textContent=posTag(p);
+      cell.appendChild(inp);cell.appendChild(tag);row.appendChild(cell);
+    }
+    root.appendChild(row);
+  }
+  renderRhymeRow();renderStatLine();
+}
+function markActive(){
+  document.querySelectorAll('#poem .cell').forEach(c=>c.classList.remove('active'));
+  if(active){const el=document.querySelector(`input[data-line="${active.line}"][data-pos="${active.pos}"]`);if(el)el.parentElement.classList.add('active');}
+}
+function onInput(e,l,p){
+  const v=e.target.value.slice(-1);e.target.value=v;
+  S.poem[l][p-1]=v;S.source[l][p-1]=v?'user':'';e.target.className=validateChar(v,p);saveState();
+  renderRhymeRow();renderStatLine();renderLookup();
+  if(v)focusNext(l,p);
+}
+function focusNext(l,p){let nl=l,np=p+1;if(np>COLS){np=1;nl++;}if(nl>=LINES)return;const el=document.querySelector(`input[data-line="${nl}"][data-pos="${np}"]`);if(el)el.focus();}
+function focusPrev(l,p){let nl=l,np=p-1;if(np<1){np=COLS;nl--;}if(nl<0)return;const el=document.querySelector(`input[data-line="${nl}"][data-pos="${np}"]`);if(el)el.focus();}
+function focusCell(l,p){if(l<0||l>=LINES||p<1||p>COLS)return;const el=document.querySelector(`input[data-line="${l}"][data-pos="${p}"]`);if(el)el.focus();}
+
+// ============================== 韻腳 row ==============================
+function currentRhyme(){if(S.rhyme)return S.rhyme;const c=S.poem[0][9];return c&&IDX.has(c)?CHARS[IDX.get(c)].y:'';}
+function renderRhymeRow(){
+  const rr=document.getElementById('rhyme-row');rr.innerHTML='';
+  const ry=currentRhyme();const locked=!!S.rhyme;
+  const lab=document.createElement('span');lab.className='chip';
+  lab.textContent=ry?`韻腳：${ry}${locked?'（鎖定）':'（暫定·首句末字）'}`:'韻腳：未定';
+  rr.appendChild(lab);
+  // 可用「依此格定韻」：若 active 是某行第10字且已填
+  if(active&&active.pos===10){const cur=S.poem[active.line][9];if(cur&&IDX.has(cur)){const b=mkBtn('依此字定韻',()=>{S.rhyme=CHARS[IDX.get(cur)].y;saveState();renderRhymeRow();renderLookup();});rr.appendChild(b);}}
+  if(locked)rr.appendChild(mkBtn('解除韻腳',()=>{S.rhyme='';saveState();renderRhymeRow();renderLookup();}));
+}
+function mkBtn(t,fn){const b=document.createElement('button');b.className='btn sm';b.textContent=t;b.onclick=fn;return b;}
+function renderStatLine(){
+  const el=document.getElementById('stat-line');if(!el)return;
+  const flat=S.poem.flat();const total=flat.filter(c=>c).length;
+  if(total<LINES*COLS){el.textContent='';return;}
+  const sys=S.source.flat().filter(s=>s==='sys').length;
+  const pct=Math.round(sys/total*100);
+  el.textContent='作家自填 '+(total-sys)+' 字 · 系統建議 '+sys+' 字（'+pct+'%）';
+}
+
+// ============================== Lookup (right) =======================
+function resetToneToCell(){
+  toneFilter=new Set(active?requiredTones(active.pos):[]);
+  syncToneChecks();
+}
+function meterToCell(){                 // 「依格律」按鈕：無選格時預設第一格，保證有聲調高亮（不全白）
+  if(!active){active={line:0,pos:1};markActive();}
+  resetToneToCell();renderLookup();
+}
+function syncToneChecks(){document.querySelectorAll('#tone-checks .tc').forEach(tc=>tc.classList.toggle('on',toneFilter.has(+tc.dataset.t)));}
+function seedChars(){
+  const raw=(document.getElementById('seed').value||'').trim();
+  if(raw)return[...raw].filter(c=>IDX.has(c));
+  if(active){return S.poem[active.line].filter(c=>c&&IDX.has(c));}  // 當行已填
+  return[];
+}
+function queryVec(seeds){
+  if(!EMB||!seeds.length)return null;
+  const q=new Float32Array(EMB.dim);
+  seeds.forEach(c=>{const i=IDX.get(c);const off=i*EMB.dim;for(let d=0;d<EMB.dim;d++)q[d]+=EMB.data[off+d];});
+  let n=0;for(let d=0;d<EMB.dim;d++)n+=q[d]*q[d];n=Math.sqrt(n)||1;for(let d=0;d<EMB.dim;d++)q[d]/=n;
+  return q;
+}
+function cosToQuery(q,charIdx){if(!q)return 0;const off=charIdx*EMB.dim;let s=0;for(let d=0;d<EMB.dim;d++)s+=q[d]*EMB.data[off+d];return s/EMB.norms[charIdx];}
+
+function setLookup(v){
+  S.lookup=v;saveState();
+  document.getElementById('st-pro').classList.toggle('active',v==='pro');
+  document.getElementById('st-easy').classList.toggle('active',v==='easy');
+  document.getElementById('easy-ctrl').style.display=v==='easy'?'':'none';
+  renderLookup();
+}
+function renderLookup(){
+  const ctx=document.getElementById('panel-ctx');
+  const basisEl=document.getElementById('basis');
+  const box=document.getElementById('cands');const cnt=document.getElementById('lk-cnt');
+  // 內文
+  if(active){const tones=requiredTones(active.pos);const kind=active.pos===10?'韻腳':(active.pos%2===0?'偶數位':'奇數位');
+    ctx.innerHTML=`第 <b>${active.line+1}</b> 行 · 第 <b>${active.pos}</b> 字 · ${kind} · 格律需 <b>${tones.map(t=>TONE_NAME[t]).join('／')}</b>`;
+  }else ctx.textContent='未選格 — 用聲調篩選自由瀏覽';
+
+  // ---------- 偷懶版·詞語模式（嚴格格律，整詞填入連續格） ----------
+  const wordMode=S.lookup==='easy'&&document.getElementById('tg-word').checked;
+  document.getElementById('wlen-wrap').style.display=wordMode?'':'none';
+  if(wordMode){
+    basisEl.dataset.yun='';basisEl.dataset.tou='';
+    if(!active){
+      cnt.textContent='';box.innerHTML='<div class="empty">詞語模式：先點左側一格，才知道從哪個位置起算格律。</div>';
+      LK_pool=[];LK_shown=0;LK_word=true;basisEl.textContent='詞語模式 — 需先選格';return;
+    }
+    const p0=active.pos;
+    // 候選：詞長 L 放在 p0，須 p0+L-1<=COLS（不跨行）且逐位格律吻合
+    const wlen=+document.getElementById('wlen').value;   // 0=全部, 2/3/4=指定, 5=5+
+    let pool=WORDS.filter(w=>{
+      const L=w.length;if(p0+L-1>COLS)return false;
+      if(wlen){if(wlen===5){if(L<5)return false;}else if(L!==wlen)return false;}
+      for(let i=0;i<L;i++){const e=CHARS[IDX.get(w[i])];if(!e||!requiredTones(p0+i).includes(e.t))return false;}
+      return true;
+    });
+    const seeds=seedChars();
+    const seedRaw=(document.getElementById('seed').value||'').trim();const useSeed=!!seedRaw;
+    // 押尾韻：詞尾字韻母 === 目標韻
+    if(document.getElementById('tg-yun').checked){
+      let ry=null;
+      if(useSeed&&seeds.length)ry=CHARS[IDX.get(seeds[seeds.length-1])].y;
+      else ry=currentRhyme();
+      if(ry){pool=pool.filter(w=>CHARS[IDX.get(w[w.length-1])].y===ry);basisEl.dataset.yun=ry;}
+    }
+    // 押頭韻：詞首字聲母 === 目標
+    if(document.getElementById('tg-tou').checked){
+      let sm=null;
+      if(useSeed&&seeds.length)sm=CHARS[IDX.get(seeds[0])].sm;
+      else{const fc=S.poem[active.line].find(c=>c&&IDX.has(c));if(fc)sm=CHARS[IDX.get(fc)].sm;}
+      if(sm!==null&&sm!==undefined&&sm!==''){pool=pool.filter(w=>CHARS[IDX.get(w[0])].sm===sm);basisEl.dataset.tou=sm;}
+    }
+    // 語意排序：詞分數＝成員字對種子 cosine 平均
+    const semOn=document.getElementById('tg-sem').checked;
+    if(semOn&&EMB&&seeds.length){
+      const q=queryVec(seeds);
+      pool=pool.map(w=>{let s=0,n=0;for(const c of w){const i=IDX.get(c);if(i<EMB.count){s+=cosToQuery(q,i);n++;}}return{w,s:n?s/n:0};}).sort((a,b)=>b.s-a.s).map(x=>x.w);
+    }
+    // 反義標記（成員字任一為種子反義）
+    const antiSet=new Set();
+    seeds.forEach(c=>{if(ANTO.has(c))ANTO.get(c).forEach(x=>antiSet.add(x));});
+    // basis 文字
+    const parts=['詞語模式（嚴格格律）'];
+    if(wlen)parts.push(`字數＝${wlen===5?'5+':wlen}`);
+    if(seeds.length)parts.push(`基準：${useSeed?'參考依據「'+seeds.join('')+'」':'當行已填「'+seeds.join('')+'」'}`);
+    if(document.getElementById('tg-yun').checked)parts.push(`尾韻＝${basisEl.dataset.yun||'（無目標·不限）'}`);
+    if(document.getElementById('tg-tou').checked)parts.push(`頭韻聲母＝${basisEl.dataset.tou||'（無目標·不限）'}`);
+    if(semOn&&EMB&&!seeds.length)parts.push('（無基準，依詞頻）');
+    basisEl.textContent=parts.join('　·　');
+    cnt.textContent=`${pool.length} 詞`;box.innerHTML='';
+    if(!pool.length){box.innerHTML='<div class="empty">此位置起無合律的詞。換格、放寬押韻、或關詞語模式。</div>';LK_pool=[];LK_shown=0;LK_word=true;return;}
+    LK_pool=pool;LK_shown=0;LK_anti=antiSet;LK_word=true;appendCands();return;
+  }
+
+  // 聲調池
+  let tones=[...toneFilter];if(!tones.length)tones=[1,2,3,4,5];
+  let pool=[];tones.forEach(t=>pool=pool.concat(BY_TONE[t]));
+  if(tones.length>1)pool.sort((a,b)=>b.f-a.f);
+
+  const easy=S.lookup==='easy';
+  let antiSet=new Set();
+  if(easy){
+    const seeds=seedChars();
+    // basis 說明
+    const seedRaw=(document.getElementById('seed').value||'').trim();
+    const useSeed=!!seedRaw;
+    // 押尾韻
+    if(document.getElementById('tg-yun').checked){
+      let ry=null;
+      if(useSeed&&seeds.length)ry=CHARS[IDX.get(seeds[seeds.length-1])].y;
+      else if(active&&active.pos===10)ry=currentRhyme();
+      if(ry)pool=pool.filter(e=>e.y===ry);
+      basisEl.dataset.yun=ry||'';
+    }
+    // 押頭韻
+    if(document.getElementById('tg-tou').checked){
+      let sm=null;
+      if(useSeed&&seeds.length)sm=CHARS[IDX.get(seeds[0])].sm;
+      else if(active){const fc=S.poem[active.line].find(c=>c&&IDX.has(c));if(fc)sm=CHARS[IDX.get(fc)].sm;}
+      if(sm!==null&&sm!==undefined&&sm!=='')pool=pool.filter(e=>e.sm===sm);
+      basisEl.dataset.tou=sm||'';
+    }
+    // 語意排序
+    let semOn=document.getElementById('tg-sem').checked;
+    if(semOn&&EMB&&seeds.length){
+      const q=queryVec(seeds);
+      pool=pool.map(e=>({e,s:cosToQuery(q,IDX.get(e.c))})).sort((a,b)=>b.s-a.s).map(x=>x.e);
+    }
+    // 反義標記
+    const antoBasis=seeds.length?seeds:[];
+    antoBasis.forEach(c=>{if(ANTO.has(c))ANTO.get(c).forEach(x=>antiSet.add(x));});
+    // basis 文字
+    const parts=[];
+    if(seeds.length)parts.push(`基準：${useSeed?'參考依據「'+seeds.join('')+'」':'當行已填「'+seeds.join('')+'」'}`);
+    else parts.push('基準：無（參考依據留空且當行尚無字）');
+    if(document.getElementById('tg-yun').checked)parts.push(`尾韻＝${basisEl.dataset.yun||'（無目標·不限）'}`);
+    if(document.getElementById('tg-tou').checked)parts.push(`頭韻聲母＝${basisEl.dataset.tou||'（無目標·不限）'}`);
+    if(semOn&&!EMB)parts.push('（字向量未載入，語意排序退回字頻）');
+    if(semOn&&EMB&&!seeds.length)parts.push('（無基準，語意排序退回字頻）');
+    basisEl.textContent=parts.join('　·　');
+  }else basisEl.textContent='';
+
+  cnt.textContent=`${pool.length} 字`;
+  box.innerHTML='';LK_word=false;
+  if(!pool.length){box.innerHTML='<div class="empty">無符合的字。放寬聲調或關掉押韻。</div>';LK_pool=[];LK_shown=0;return;}
+  LK_pool=pool;LK_shown=0;LK_anti=antiSet;
+  appendCands();
+}
+let LK_pool=[],LK_shown=0,LK_anti=new Set(),LK_word=false;const LK_PAGE=150;
+function zyInner(z){                                  // 注音字串 -> 內層 html（調號標位）
+  const[zyCore,zyTone]=splitZy(z);
+  if(zyTone==='˙'){                                  // 輕聲：˙置頂，咬字直排其下
+    const cores=[...zyCore].map(c=>`<span class="zc">${c}</span>`).join('');
+    return `<span class="neutral">˙</span>${cores}`;
+  }
+  const chars=[...zyCore];const last=chars.pop()||'';// 一/二/三/四聲：調號標末符號右上
+  const head=chars.map(c=>`<span class="zc">${c}</span>`).join('');
+  const tn=zyTone?`<span class="tn">${zyTone}</span>`:'';
+  return `${head}<span class="zy-last">${last}${tn}</span>`;
+}
+function makeCand(e,antiSet){
+  const b=document.createElement('button');b.className='cand'+(antiSet.has(e.c)?' anti':'');
+  b.innerHTML=`<span class="ch">${e.c}</span><span class="zy">${zyInner(e.z)}</span>`+(antiSet.has(e.c)?'<span class="badge">反</span>':'');
+  b.title=`${TONE_NAME[e.t]} · 韻母 ${e.y} · 常用度 ${e.f}`+(antiSet.has(e.c)?' · 反義':'');
+  b.onclick=()=>fillActive(e.c);
+  return b;
+}
+function makeWordCand(w,antiSet){
+  const b=document.createElement('button');
+  const chs=[...w];const anti=chs.some(c=>antiSet.has(c));
+  b.className='cand word'+(anti?' anti':'');
+  b.innerHTML=chs.map(c=>{const e=CHARS[IDX.get(c)];return `<span class="wch"><span class="ch">${c}</span><span class="zy">${zyInner(e.z)}</span></span>`;}).join('')+(anti?'<span class="badge">反</span>':'');
+  b.title=w+' · '+chs.map(c=>TONE_NAME[CHARS[IDX.get(c)].t]).join('');
+  b.onclick=()=>fillWord(w);
+  return b;
+}
+function appendCands(){
+  const box=document.getElementById('cands');
+  const end=Math.min(LK_shown+LK_PAGE,LK_pool.length);
+  const frag=document.createDocumentFragment();
+  for(let i=LK_shown;i<end;i++)frag.appendChild((LK_word?makeWordCand:makeCand)(LK_pool[i],LK_anti));
+  box.appendChild(frag);LK_shown=end;
+}
+function fillActive(ch){
+  if(!active){return;}
+  const{line,pos}=active;S.poem[line][pos-1]=ch;S.source[line][pos-1]='sys';saveState();
+  const el=document.querySelector(`input[data-line="${line}"][data-pos="${pos}"]`);
+  if(el){el.value=ch;el.className=validateChar(ch,pos);}
+  renderRhymeRow();renderStatLine();focusNext(line,pos);renderLookup();
+}
+function fillWord(w){
+  if(!active)return;
+  const{line,pos}=active;const chs=[...w];
+  if(pos+chs.length-1>COLS)return;                 // 不跨行（理論上候選已過濾）
+  chs.forEach((c,i)=>{S.poem[line][pos-1+i]=c;S.source[line][pos-1+i]='sys';});
+  saveState();
+  chs.forEach((c,i)=>{const el=document.querySelector(`input[data-line="${line}"][data-pos="${pos+i}"]`);if(el){el.value=c;el.className=validateChar(c,pos+i);}});
+  renderRhymeRow();renderStatLine();focusNext(line,pos+chs.length-1);renderLookup();
+}
+
+// ============================== Tone-check events ====================
+function initToneChecks(){
+  document.querySelectorAll('#tone-checks .tc').forEach(tc=>{
+    tc.onclick=()=>{const t=+tc.dataset.t;if(toneFilter.has(t))toneFilter.delete(t);else toneFilter.add(t);syncToneChecks();renderLookup();};
+  });
+}
+
+// ============================== Settings =============================
+function setLight(m){
+  S.light=m;saveState();
+  document.querySelectorAll('#lightmode button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  document.getElementById('lg-light').textContent={three:'三聲',qing:'輕聲',both:'三聲或輕聲'}[m];
+  renderPoem();if(active)resetToneToCell();renderLookup();
+}
+function clearPoem(){if(!confirm('清空整首詩？'))return;S.poem=Array.from({length:LINES},()=>Array(COLS).fill(''));S.source=Array.from({length:LINES},()=>Array(COLS).fill(''));S.rhyme='';saveState();active=null;renderPoem();renderLookup();}
+
+// ============================== Import / Export ======================
+function exportJSON(){
+  const blob=new Blob([JSON.stringify({poem:S.poem,light:S.light,rhyme:S.rhyme},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='抑揚五步格-詩稿.json';a.click();URL.revokeObjectURL(a.href);
+}
+document.getElementById('imp').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{const d=JSON.parse(await f.text());
+    if(!d.poem||!Array.isArray(d.poem)||d.poem.length!==LINES)throw new Error('格式不符');
+    S.poem=d.poem.map(r=>{const a=Array(COLS).fill('');(r||[]).slice(0,COLS).forEach((c,i)=>a[i]=c||'');return a;});
+    if(d.light)S.light=d.light;if(typeof d.rhyme==='string')S.rhyme=d.rhyme;S.source=Array.from({length:LINES},()=>Array(COLS).fill(''));
+    saveState();setLight(S.light);renderPoem();renderLookup();
+  }catch(err){alert('讀取失敗：'+err.message);}
+  e.target.value='';
+});
+
+// ============================== Settings dropdown ====================
+function toggleSettings(e){
+  e.stopPropagation();
+  document.getElementById('settings-menu').classList.toggle('open');
+}
+document.addEventListener('click',()=>document.getElementById('settings-menu').classList.remove('open'));
+
+// ============================== Read mode ============================
+let readMode=false;
+function toggleRead(){
+  readMode=!readMode;
+  document.getElementById('cols').style.display=readMode?'none':'';
+  const pr=document.getElementById('poem-read');
+  const btn=document.getElementById('btn-read');
+  if(readMode){
+    pr.innerHTML='';
+    S.poem.forEach(row=>{
+      const d=document.createElement('div');d.className='line-text';
+      d.textContent=row.map(c=>c||'　').join('');pr.appendChild(d);
+    });
+    const h=document.createElement('div');h.className='read-hint';
+    h.textContent='點「編輯」回到格子模式';pr.appendChild(h);
+    pr.classList.add('show');btn.textContent='編輯';
+  }else{
+    pr.classList.remove('show');btn.textContent='清讀';
+  }
+}
+
+// ============================== Init ===================================
+function init(){
+  initToneChecks();
+  document.querySelectorAll('#lightmode button').forEach(b=>b.classList.toggle('on',b.dataset.m===S.light));
+  document.getElementById('lg-light').textContent={three:'三聲',qing:'輕聲',both:'三聲或輕聲'}[S.light];
+  document.getElementById('cands').addEventListener('scroll',function(){
+    if(this.scrollTop+this.clientHeight>=this.scrollHeight-60&&LK_shown<LK_pool.length)appendCands();
+  });
+  renderPoem();
+  setLookup(S.lookup||'pro');
+}
+init();
+</script>
+</body>
+</html>
