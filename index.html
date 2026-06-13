@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>抑揚五步格 · 寫詩工具</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ButTaiwan/taipei-sans-tc-font/css/taipei-sans-tc.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
@@ -21,6 +21,8 @@ body{
   margin:0; background:var(--bg); color:var(--text);
   font-family:'Taipei Sans TC Beta','Noto Sans TC',Georgia,'Times New Roman',serif;
   line-height:1.5;
+  -webkit-text-size-adjust:100%; text-size-adjust:100%;
+  -webkit-tap-highlight-color:rgba(30,58,138,.12);
 }
 h1{font-size:1.2rem;margin:0;font-weight:700;letter-spacing:.02em}
 h2{font-size:.92rem;margin:0 0 .5rem;color:var(--text-muted);font-weight:500}
@@ -133,6 +135,42 @@ select,input{font-family:inherit}
 .line-text{font-size:2rem;line-height:2;letter-spacing:.2em;color:var(--text)}
 .read-hint{font-size:.78rem;color:var(--text-muted);margin-top:1.5rem}
 .stat-line{font-size:.74rem;color:var(--text-muted);margin-top:.4rem}
+/* ============================== Mobile / 行動版 ===================== */
+@media(max-width:600px){
+  .wrap{padding:.6rem .5rem}
+  .toolbar{padding:.5rem .6rem;gap:.4rem;margin-bottom:.7rem;border-radius:7px}
+  h1{font-size:1.05rem}
+  .toolbar>span{font-size:.72rem}
+  .btn{padding:.42rem .7rem}            /* 拇指友善：高度↑ */
+  .card{padding:.8rem .65rem}
+  .cols{gap:.7rem}
+  h2{font-size:.86rem}
+  .legend{font-size:.68rem;gap:.5rem .8rem;margin-bottom:.55rem}
+  /* 寫詩格：縮到一行十字仍不溢出 */
+  .poem{gap:.42rem}
+  .line{gap:.16rem}
+  .line-no{width:.95rem;font-size:.62rem;padding-top:.62rem}
+  .cell input{width:1.8rem;height:1.8rem;font-size:1.05rem;border-radius:5px}
+  .cell .tag{font-size:.5rem}
+  /* 查字區控制列 */
+  .subtab{padding:.4rem .9rem}
+  .tone-checks{gap:.28rem}
+  .tone-checks .tc{padding:.36rem .6rem}   /* 拇指友善 */
+  .ctrl{gap:.45rem .6rem}
+  .seed-in{width:auto;flex:1 1 8rem;min-width:0}
+  .cands{max-height:46vh}
+  /* 清讀模式 */
+  .poem-read{padding:1.4rem 1.1rem}
+  .line-text{font-size:1.5rem;letter-spacing:.12em;line-height:1.85;white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .read-hint{margin-top:1rem}
+}
+@media(max-width:400px){
+  .line{gap:.12rem}
+  .line-no{width:.8rem;font-size:.58rem;padding-top:.55rem}
+  .cell input{width:1.55rem;height:1.55rem;font-size:.92rem}
+  .cell .tag{font-size:.46rem}
+  .line-text{font-size:1.25rem;letter-spacing:.08em}
+}
 </style>
 </head>
 <body>
