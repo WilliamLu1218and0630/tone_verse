@@ -36,7 +36,7 @@
 
 根目錄只留交付物，源檔全收進 `_src\`。
 
-- `tone_verse.html` — **交付物**（根目錄）。單檔自包含工具（2.3MB，內嵌字庫＋字向量＋反義表）。直接雙擊開。**勿手動編輯**（巨檔不可維護），一律改 `_src\template.html` 再 rebuild。
+- `index.html` — **交付物**（根目錄，Vercel 部署入口）。單檔自包含工具（2.3MB，內嵌字庫＋字向量＋反義表）。直接雙擊開。**勿手動編輯**（巨檔不可維護），一律改 `_src\template.html` 再 rebuild。
 - `_src\template.html` — HTML 模板（程式碼源頭，含 `/*__DB__*/` `/*__EMB__*/` `/*__ANTO__*/` `/*__WORDS__*/` 四注入點）。所有 UI／CSS／JS 改動改這支。
 - `_src\generate_db.py` — 字庫管線（wordfreq 頻 → Big5＋OpenCC 濾繁 → pypinyin 注音 → 解析調/聲母/韻）。
 - `_src\gen_embeddings.py` — 語意字向量管線（model2vec 靜態向量，純 numpy 不需 torch → int8 量化）。
@@ -49,7 +49,7 @@
 ### 重新生成指令（從專案根目錄執行）
 ```
 cd _src; python generate_db.py; python gen_embeddings.py; python gen_words.py; cd ..   # 重建字庫/字向量/詞庫（首次會下載 model2vec 多語模型；gen_words 須先有 chars_db.json）
-python -c "t=open('_src/template.html',encoding='utf-8').read();t=t.replace('/*__DB__*/',open('_src/chars_db.json',encoding='utf-8').read());t=t.replace('/*__EMB__*/',open('_src/embeddings.json',encoding='utf-8').read());t=t.replace('/*__ANTO__*/',open('_src/antonyms.json',encoding='utf-8').read());t=t.replace('/*__WORDS__*/',open('_src/words.json',encoding='utf-8').read());open('tone_verse.html','w',encoding='utf-8').write(t)"
+python -c "t=open('_src/template.html',encoding='utf-8').read();t=t.replace('/*__DB__*/',open('_src/chars_db.json',encoding='utf-8').read());t=t.replace('/*__EMB__*/',open('_src/embeddings.json',encoding='utf-8').read());t=t.replace('/*__ANTO__*/',open('_src/antonyms.json',encoding='utf-8').read());t=t.replace('/*__WORDS__*/',open('_src/words.json',encoding='utf-8').read());open('index.html','w',encoding='utf-8').write(t)"
 ```
 > 多數 UI 改動只需改 `_src\template.html` ＋跑上面最後一行（注入指令），不必重建字庫。
 
