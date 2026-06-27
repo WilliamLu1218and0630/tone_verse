@@ -205,6 +205,13 @@ select,input{font-family:inherit}
             <button data-m="both" onclick="setLight('both')">皆含</button>
           </div>
         </div>
+        <div class="srow" style="margin-top:.5rem">
+          <span>押韻模式</span>
+          <div class="seg" id="rhymemode">
+            <button data-m="exact" class="on" onclick="setBroadRhyme(false)">精確韻</button>
+            <button data-m="broad" onclick="setBroadRhyme(true)">寬韻</button>
+          </div>
+        </div>
       </div>
     </div>
     <button class="btn" onclick="exportJSON()">匯出</button>
@@ -306,6 +313,9 @@ CHARS.forEach(e=>{
 });
 Object.values(BY_TONE).forEach(arr=>arr.sort((a,b)=>b.f-a.f));
 const TONE_NAME={1:'一聲',2:'二聲',3:'三聲',4:'四聲',5:'輕聲'};
+// 十四韻寬韻分組
+const RHYME_GROUP={ㄚ:'發花',ㄧㄚ:'發花',ㄨㄚ:'發花',ㄛ:'梭波',ㄜ:'梭波',ㄨㄛ:'梭波',ㄧㄛ:'梭波',ㄦ:'梭波',ㄧㄝ:'乜斜',ㄩㄝ:'乜斜',ㄧ:'衣期',ㄨ:'姑蘇',ㄩ:'居需',ㄞ:'懷來',ㄨㄞ:'懷來',ㄟ:'灰堆',ㄨㄟ:'灰堆',ㄠ:'遙條',ㄧㄠ:'遙條',ㄡ:'由求',ㄧㄡ:'由求',ㄢ:'言前',ㄧㄢ:'言前',ㄨㄢ:'言前',ㄩㄢ:'言前',ㄣ:'人辰',ㄧㄣ:'人辰',ㄨㄣ:'人辰',ㄩㄣ:'人辰',ㄤ:'江陽',ㄧㄤ:'江陽',ㄨㄤ:'江陽',ㄥ:'中東',ㄧㄥ:'中東',ㄨㄥ:'中東',ㄩㄥ:'中東'};
+function rhymeMatch(a,b){if(!a||!b)return false;if(a===b)return true;return S.broadRhyme&&RHYME_GROUP[a]===RHYME_GROUP[b];}
 const ZY_TONES=new Set(['ˊ','ˇ','ˋ','˙']);
 function splitZy(z){const last=z.slice(-1);return ZY_TONES.has(last)?[z.slice(0,-1),last]:[z,''];}
 const LINES=4,COLS=10;
@@ -337,7 +347,7 @@ const WORDS=(function(){const r=_WD.words||[];if(!r.length||typeof r[0]==='strin
 const WORD_POS=(function(){const r=_WD.words||[];if(!r.length||typeof r[0]==='string')return new Map();const m=new Map();r.forEach(x=>m.set(x.w,x.p));return m;})();
 
 // ============================== State =================================
-function defaultState(){return{poem:Array.from({length:LINES},()=>Array(COLS).fill('')),source:Array.from({length:LINES},()=>Array(COLS).fill('')),light:'three',rhyme:'',lookup:'pro'};}
+function defaultState(){return{poem:Array.from({length:LINES},()=>Array(COLS).fill('')),source:Array.from({length:LINES},()=>Array(COLS).fill('')),light:'three',rhyme:'',lookup:'pro',broadRhyme:false};}
 let S=loadState();
 let active=null;                 // {line,pos} 1-based pos
 // Undo/Redo
@@ -424,7 +434,8 @@ function renderRhymeRow(){
   const rr=document.getElementById('rhyme-row');rr.innerHTML='';
   const ry=currentRhyme();const locked=!!S.rhyme;
   const lab=document.createElement('span');lab.className='chip';
-  lab.textContent=ry?`韻腳：${ry}${locked?'（鎖定）':'（暫定·首句末字）'}`:'韻腳：未定';
+  const grp=ry&&S.broadRhyme&&RHYME_GROUP[ry]?` (${RHYME_GROUP[ry]}韻)`:'';
+  lab.textContent=ry?`韻腳：${ry}${grp}${locked?'（鎖定）':'（暫定·首句末字）'}`:'韻腳：未定';
   rr.appendChild(lab);
   // 可用「依此格定韻」：若 active 是某行第10字且已填
   if(active&&active.pos===10){const cur=S.poem[active.line][9];if(cur&&IDX.has(cur)){const b=mkBtn('依此字定韻',()=>{S.rhyme=CHARS[IDX.get(cur)].y;saveState();renderRhymeRow();renderLookup();});rr.appendChild(b);}}
@@ -510,7 +521,7 @@ function renderLookup(){
       let ry=null;
       if(useSeed&&seeds.length)ry=CHARS[IDX.get(seeds[seeds.length-1])].y;
       else ry=currentRhyme();
-      if(ry){pool=pool.filter(w=>{const le=CHARS[IDX.get(w[w.length-1])];return le.y===ry||(le.alts&&le.alts.some(a=>a.y===ry));});basisEl.dataset.yun=ry;}
+      if(ry){pool=pool.filter(w=>{const le=CHARS[IDX.get(w[w.length-1])];return rhymeMatch(le.y,ry)||(le.alts&&le.alts.some(a=>rhymeMatch(a.y,ry)));});basisEl.dataset.yun=ry;}
     }
     // 押頭韻：詞首字聲母 === 目標
     if(document.getElementById('tg-tou').checked){
@@ -562,7 +573,7 @@ function renderLookup(){
       let ry=null;
       if(useSeed&&seeds.length)ry=CHARS[IDX.get(seeds[seeds.length-1])].y;
       else if(active&&active.pos===10)ry=currentRhyme();
-      if(ry)pool=pool.filter(e=>e.y===ry||(e.alts&&e.alts.some(a=>a.y===ry)));
+      if(ry)pool=pool.filter(e=>rhymeMatch(e.y,ry)||(e.alts&&e.alts.some(a=>rhymeMatch(a.y,ry))));
       basisEl.dataset.yun=ry||'';
     }
     // 押頭韻
@@ -670,6 +681,11 @@ function setLight(m){
   document.getElementById('lg-light').textContent={three:'三聲',qing:'輕聲',both:'三聲或輕聲'}[m];
   renderPoem();if(active)resetToneToCell();renderLookup();
 }
+function setBroadRhyme(on){
+  S.broadRhyme=on;saveState();
+  document.querySelectorAll('#rhymemode button').forEach(b=>b.classList.toggle('on',b.dataset.m===(on?'broad':'exact')));
+  renderPoem();renderLookup();
+}
 // ============================== Example poem ============================
 const EXAMPLE_POEM={poem:[
   [...'你說我該走開點心已到'],
@@ -758,6 +774,7 @@ function init(){
   initPosChecks();
   document.querySelectorAll('#lightmode button').forEach(b=>b.classList.toggle('on',b.dataset.m===S.light));
   document.getElementById('lg-light').textContent={three:'三聲',qing:'輕聲',both:'三聲或輕聲'}[S.light];
+  document.querySelectorAll('#rhymemode button').forEach(b=>b.classList.toggle('on',b.dataset.m===(S.broadRhyme?'broad':'exact')));
   document.getElementById('cands').addEventListener('scroll',function(){
     if(this.scrollTop+this.clientHeight>=this.scrollHeight-60&&LK_shown<LK_pool.length)appendCands();
   });
