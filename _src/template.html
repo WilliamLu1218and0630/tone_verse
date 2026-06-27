@@ -15,6 +15,15 @@
   --qing:#b45309; --ping:#1e3a8a; --yun:#9d174d;
   --ok:#15803d; --bad:#b91c1c; --anti:#9d174d;
 }
+:root.dark{
+  --bg:#1a1a2e; --surface:#16213e; --elevated:#0f3460;
+  --text:#e0e0e8; --text-muted:#9a9ab0;
+  --accent:#6b9ff2; --accent-hover:#89b4f8; --border:#2a2a4a;
+  --qing:#e09f3e; --ping:#6b9ff2; --yun:#e87aa4;
+  --ok:#38b764; --bad:#e05252; --anti:#e87aa4;
+}
+:root.dark input,:root.dark select,:root.dark button{color-scheme:dark}
+:root.dark .cell input{background:var(--surface);color:var(--text);border-color:var(--border)}
 /* ============================== Base & Typography ====================== */
 *{box-sizing:border-box}
 body{
@@ -185,6 +194,10 @@ select,input{font-family:inherit}
       <button class="btn" id="btn-settings" onclick="toggleSettings(event)">設定</button>
       <div class="settings-menu" id="settings-menu" onclick="event.stopPropagation()">
         <div class="srow">
+          <span>深色模式</span>
+          <button class="btn sm" onclick="toggleDark()">切換</button>
+        </div>
+        <div class="srow" style="margin-top:.5rem">
           <span>輕位模式</span>
           <div class="seg" id="lightmode">
             <button data-m="three" class="on" onclick="setLight('three')">三聲</button>
@@ -197,7 +210,11 @@ select,input{font-family:inherit}
     <button class="btn" onclick="exportJSON()">匯出</button>
     <button class="btn" onclick="document.getElementById('imp').click()">匯入</button>
     <input type="file" id="imp" accept=".json" style="display:none">
+    <button class="btn" onclick="loadExample()">範例</button>
     <button class="btn" onclick="clearPoem()">清空</button>
+    <button class="btn" onclick="undo()" title="復原 (Ctrl+Z)">↩</button>
+    <button class="btn" onclick="redo()" title="重做 (Ctrl+Shift+Z)">↪</button>
+    <button class="btn" onclick="toggleHelp()" title="快捷鍵說明">?</button>
   </div>
 
   <div id="poem-read" class="poem-read"></div>
@@ -277,6 +294,17 @@ const CHARS=DB.chars;                       // [{c,f,z,t,sm,y}] 依 f 由高到�
 const IDX=new Map(CHARS.map((e,i)=>[e.c,i]));
 const BY_TONE={1:[],2:[],3:[],4:[],5:[]};
 CHARS.forEach(e=>BY_TONE[e.t].push(e));
+// 破音字：ALL_TONES map + BY_TONE 增補
+const ALL_TONES=new Map();
+CHARS.forEach(e=>{
+  const tones=new Set([e.t]);
+  if(e.alts)e.alts.forEach(a=>tones.add(a.t));
+  ALL_TONES.set(e.c,tones);
+});
+CHARS.forEach(e=>{
+  if(e.alts)e.alts.forEach(a=>{if(a.t!==e.t)BY_TONE[a.t].push(e);});
+});
+Object.values(BY_TONE).forEach(arr=>arr.sort((a,b)=>b.f-a.f));
 const TONE_NAME={1:'一聲',2:'二聲',3:'三聲',4:'四聲',5:'輕聲'};
 const ZY_TONES=new Set(['ˊ','ˇ','ˋ','˙']);
 function splitZy(z){const last=z.slice(-1);return ZY_TONES.has(last)?[z.slice(0,-1),last]:[z,''];}
@@ -312,6 +340,21 @@ const WORD_POS=(function(){const r=_WD.words||[];if(!r.length||typeof r[0]==='st
 function defaultState(){return{poem:Array.from({length:LINES},()=>Array(COLS).fill('')),source:Array.from({length:LINES},()=>Array(COLS).fill('')),light:'three',rhyme:'',lookup:'pro'};}
 let S=loadState();
 let active=null;                 // {line,pos} 1-based pos
+// Undo/Redo
+const HISTORY=[];let historyIdx=-1;const MAX_HISTORY=50;
+function pushHistory(){
+  const snap=JSON.stringify({poem:S.poem,source:S.source,rhyme:S.rhyme});
+  if(historyIdx<HISTORY.length-1)HISTORY.length=historyIdx+1;
+  HISTORY.push(snap);if(HISTORY.length>MAX_HISTORY)HISTORY.shift();
+  historyIdx=HISTORY.length-1;
+}
+function undo(){if(historyIdx<=0)return;historyIdx--;applyHistory();}
+function redo(){if(historyIdx>=HISTORY.length-1)return;historyIdx++;applyHistory();}
+function applyHistory(){
+  const snap=JSON.parse(HISTORY[historyIdx]);
+  S.poem=snap.poem;S.source=snap.source;S.rhyme=snap.rhyme;
+  saveState();renderPoem();renderLookup();
+}
 let toneFilter=new Set();        // 目前聲調過濾（手動可改）
 let posFilter=new Set();         // 詞性過濾（偷懶版詞語模式，空=全部）
 
@@ -330,7 +373,7 @@ function requiredTones(pos){
 }
 function posClass(pos){return pos===10?'t-yun':(pos%2===0?'t-ping':'t-qing');}
 function posTag(pos){return pos===10?'韻':(pos%2===0?'平':'輕');}
-function validateChar(ch,pos){if(!ch)return'';const e=CHARS[IDX.get(ch)];if(e===undefined||!IDX.has(ch))return'unknown';return requiredTones(pos).includes(CHARS[IDX.get(ch)].t)?'ok':'bad';}
+function validateChar(ch,pos){if(!ch)return'';if(!IDX.has(ch))return'unknown';const tones=ALL_TONES.get(ch);return requiredTones(pos).some(t=>tones&&tones.has(t))?'ok':'bad';}
 
 // ============================== Poem render ===========================
 function renderPoem(){
@@ -367,7 +410,7 @@ function markActive(){
 }
 function onInput(e,l,p){
   const v=e.target.value.slice(-1);e.target.value=v;
-  S.poem[l][p-1]=v;S.source[l][p-1]=v?'user':'';e.target.className=validateChar(v,p);saveState();
+  S.poem[l][p-1]=v;S.source[l][p-1]=v?'user':'';e.target.className=validateChar(v,p);pushHistory();saveState();
   renderRhymeRow();renderStatLine();renderLookup();
   if(v)focusNext(l,p);
 }
@@ -457,7 +500,7 @@ function renderLookup(){
     let pool=WORDS.filter(w=>{
       const L=w.length;if(p0+L-1>COLS)return false;
       if(wlen){if(wlen===5){if(L<5)return false;}else if(L!==wlen)return false;}
-      for(let i=0;i<L;i++){const e=CHARS[IDX.get(w[i])];if(!e||!requiredTones(p0+i).includes(e.t))return false;}
+      for(let i=0;i<L;i++){const ct=ALL_TONES.get(w[i]);if(!ct||!requiredTones(p0+i).some(t=>ct.has(t)))return false;}
       return true;
     });
     const seeds=seedChars();
@@ -467,7 +510,7 @@ function renderLookup(){
       let ry=null;
       if(useSeed&&seeds.length)ry=CHARS[IDX.get(seeds[seeds.length-1])].y;
       else ry=currentRhyme();
-      if(ry){pool=pool.filter(w=>CHARS[IDX.get(w[w.length-1])].y===ry);basisEl.dataset.yun=ry;}
+      if(ry){pool=pool.filter(w=>{const le=CHARS[IDX.get(w[w.length-1])];return le.y===ry||(le.alts&&le.alts.some(a=>a.y===ry));});basisEl.dataset.yun=ry;}
     }
     // 押頭韻：詞首字聲母 === 目標
     if(document.getElementById('tg-tou').checked){
@@ -519,7 +562,7 @@ function renderLookup(){
       let ry=null;
       if(useSeed&&seeds.length)ry=CHARS[IDX.get(seeds[seeds.length-1])].y;
       else if(active&&active.pos===10)ry=currentRhyme();
-      if(ry)pool=pool.filter(e=>e.y===ry);
+      if(ry)pool=pool.filter(e=>e.y===ry||(e.alts&&e.alts.some(a=>a.y===ry)));
       basisEl.dataset.yun=ry||'';
     }
     // 押頭韻
@@ -569,9 +612,14 @@ function zyInner(z){                                  // 注音字串 -> 內層 
   return `${head}<span class="zy-last">${last}${tn}</span>`;
 }
 function makeCand(e,antiSet){
+  let dz=e.z,dt=e.t,isAlt=false;
+  if(e.alts&&toneFilter.size>0&&!toneFilter.has(e.t)){
+    const alt=e.alts.find(a=>toneFilter.has(a.t));
+    if(alt){dz=alt.z;dt=alt.t;isAlt=true;}
+  }
   const b=document.createElement('button');b.className='cand'+(antiSet.has(e.c)?' anti':'');
-  b.innerHTML=`<span class="ch">${e.c}</span><span class="zy">${zyInner(e.z)}</span>`+(antiSet.has(e.c)?'<span class="badge">反</span>':'');
-  b.title=`${TONE_NAME[e.t]} · 韻母 ${e.y} · 常用度 ${e.f}`+(antiSet.has(e.c)?' · 反義':'');
+  b.innerHTML=`<span class="ch">${e.c}</span><span class="zy">${zyInner(dz)}</span>`+(isAlt?'<span class="badge" style="background:var(--qing)">破</span>':'')+(antiSet.has(e.c)?'<span class="badge">反</span>':'');
+  b.title=`${TONE_NAME[dt]} · 韻母 ${isAlt?e.alts.find(a=>a.t===dt).y:e.y} · 常用度 ${e.f}`+(isAlt?' · 破音字':'')+(antiSet.has(e.c)?' · 反義':'');
   b.onclick=()=>fillActive(e.c);
   return b;
 }
@@ -593,7 +641,7 @@ function appendCands(){
 }
 function fillActive(ch){
   if(!active){return;}
-  const{line,pos}=active;S.poem[line][pos-1]=ch;S.source[line][pos-1]='sys';saveState();
+  const{line,pos}=active;S.poem[line][pos-1]=ch;S.source[line][pos-1]='sys';pushHistory();saveState();
   const el=document.querySelector(`input[data-line="${line}"][data-pos="${pos}"]`);
   if(el){el.value=ch;el.className=validateChar(ch,pos);}
   renderRhymeRow();renderStatLine();focusNext(line,pos);renderLookup();
@@ -603,7 +651,7 @@ function fillWord(w){
   const{line,pos}=active;const chs=[...w];
   if(pos+chs.length-1>COLS)return;                 // 不跨行（理論上候選已過濾）
   chs.forEach((c,i)=>{S.poem[line][pos-1+i]=c;S.source[line][pos-1+i]='sys';});
-  saveState();
+  pushHistory();saveState();
   chs.forEach((c,i)=>{const el=document.querySelector(`input[data-line="${line}"][data-pos="${pos+i}"]`);if(el){el.value=c;el.className=validateChar(c,pos+i);}});
   renderRhymeRow();renderStatLine();focusNext(line,pos+chs.length-1);renderLookup();
 }
@@ -622,7 +670,21 @@ function setLight(m){
   document.getElementById('lg-light').textContent={three:'三聲',qing:'輕聲',both:'三聲或輕聲'}[m];
   renderPoem();if(active)resetToneToCell();renderLookup();
 }
-function clearPoem(){if(!confirm('清空整首詩？'))return;S.poem=Array.from({length:LINES},()=>Array(COLS).fill(''));S.source=Array.from({length:LINES},()=>Array(COLS).fill(''));S.rhyme='';saveState();active=null;renderPoem();renderLookup();}
+// ============================== Example poem ============================
+const EXAMPLE_POEM={poem:[
+  [...'你說我該走開點心已到'],
+  [...'有些好書寫真美多小道'],
+  [...'每天等她把歌給開好報'],
+  [...'想家反身起風找些老照']
+],rhyme:'ㄠ'};
+function loadExample(){
+  if(S.poem.flat().some(c=>c)&&!confirm('載入範例將覆蓋目前內容，確定？'))return;
+  S.poem=EXAMPLE_POEM.poem.map(r=>[...r]);
+  S.source=Array.from({length:LINES},()=>Array(COLS).fill('example'));
+  S.rhyme=EXAMPLE_POEM.rhyme;S.light='three';
+  pushHistory();saveState();setLight(S.light);renderPoem();renderLookup();
+}
+function clearPoem(){if(!confirm('清空整首詩？'))return;S.poem=Array.from({length:LINES},()=>Array(COLS).fill(''));S.source=Array.from({length:LINES},()=>Array(COLS).fill(''));S.rhyme='';pushHistory();saveState();active=null;renderPoem();renderLookup();}
 
 // ============================== Import / Export ======================
 function exportJSON(){
@@ -647,6 +709,16 @@ function toggleSettings(e){
 }
 document.addEventListener('click',()=>document.getElementById('settings-menu').classList.remove('open'));
 
+// ============================== Help modal ============================
+function toggleHelp(){
+  let el=document.getElementById('help-modal');
+  if(el){el.remove();return;}
+  el=document.createElement('div');el.id='help-modal';
+  el.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,.18);max-width:340px;font-size:.85rem;line-height:1.8';
+  el.innerHTML='<h2 style="margin:0 0 .5rem">快捷鍵</h2><div>← → ↑ ↓ 方向鍵移格</div><div>Backspace 清除並退格</div><div>Ctrl+Z 復原</div><div>Ctrl+Shift+Z / Ctrl+Y 重做</div><div style="margin-top:.8rem"><button class="btn" onclick="toggleHelp()">關閉</button></div>';
+  document.body.appendChild(el);
+}
+
 // ============================== Read mode ============================
 let readMode=false;
 function toggleRead(){
@@ -668,6 +740,18 @@ function toggleRead(){
   }
 }
 
+// ============================== Dark mode ===============================
+function initDarkMode(){
+  const saved=localStorage.getItem('tone_verse_dark');
+  const isDark=saved!==null?saved==='true':window.matchMedia('(prefers-color-scheme:dark)').matches;
+  document.documentElement.classList.toggle('dark',isDark);
+}
+function toggleDark(){
+  const isDark=document.documentElement.classList.toggle('dark');
+  localStorage.setItem('tone_verse_dark',isDark);
+}
+initDarkMode();
+
 // ============================== Init ===================================
 function init(){
   initToneChecks();
@@ -677,8 +761,14 @@ function init(){
   document.getElementById('cands').addEventListener('scroll',function(){
     if(this.scrollTop+this.clientHeight>=this.scrollHeight-60&&LK_shown<LK_pool.length)appendCands();
   });
+  pushHistory();
   renderPoem();
   setLookup(S.lookup||'pro');
+  document.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.shiftKey){e.preventDefault();undo();}
+    if((e.ctrlKey||e.metaKey)&&e.key==='z'&&e.shiftKey){e.preventDefault();redo();}
+    if((e.ctrlKey||e.metaKey)&&e.key==='y'){e.preventDefault();redo();}
+  });
 }
 init();
 </script>

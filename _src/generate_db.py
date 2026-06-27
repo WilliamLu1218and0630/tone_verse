@@ -58,7 +58,7 @@ for cp in range(0x4E00, 0xA000):
         continue
     if s2t.convert(ch) != ch:
         continue
-    # 主讀音(最常見)：避免 heteronym 把罕見/古音收進來污染聲調過濾
+    # 主讀音(最常見)
     readings = pinyin(ch, heteronym=False, style=Style.BOPOMOFO)
     if not readings or not readings[0]:
         continue
@@ -66,7 +66,21 @@ for cp in range(0x4E00, 0xA000):
     if not zy or (zy[0] not in SHENGMU and zy[0] not in 'ㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄧㄨㄩ'):
         continue
     z, t, sm, y = parse_reading(zy)
-    chars.append({'c': ch, 'f': round(f, 2), 'z': z, 't': t, 'sm': sm, 'y': y})
+    entry = {'c': ch, 'f': round(f, 2), 'z': z, 't': t, 'sm': sm, 'y': y}
+    # 破音字：heteronym 取前 3 筆，只留聲調不同的 alt（Zipf < 3.5 的罕字不收）
+    if f >= 3.5:
+        het = pinyin(ch, heteronym=True, style=Style.BOPOMOFO)
+        if het and het[0] and len(het[0]) > 1:
+            seen = {t}
+            alts = []
+            for r in het[0][1:3]:
+                az, at, asm, ay = parse_reading(r)
+                if at not in seen:
+                    seen.add(at)
+                    alts.append({'z': az, 't': at, 'sm': asm, 'y': ay})
+            if alts:
+                entry['alts'] = alts
+    chars.append(entry)
 
 chars.sort(key=lambda x: -x['f'])
 out = {
@@ -89,3 +103,6 @@ print('各聲調字數:', dict(sorted(tc.items())))
 print('範例(高頻):', [c['c'] for c in chars[:20]])
 print('輕聲池(驗雜訊):', [c['c'] for c in chars if c['t'] == 5])
 print('帶聲母範例:', [(c['c'], c['sm'], c['y']) for c in chars[:6]])
+poly = [c for c in chars if 'alts' in c]
+print(f'破音字: {len(poly)} 字, 總alt {sum(len(c["alts"]) for c in poly)} 條')
+print('破音字範例:', [(c['c'], c['t'], [(a['t'],a['z']) for a in c['alts']]) for c in poly[:10]])
