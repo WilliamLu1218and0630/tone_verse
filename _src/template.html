@@ -15,15 +15,6 @@
   --qing:#b45309; --ping:#1e3a8a; --yun:#9d174d;
   --ok:#15803d; --bad:#b91c1c; --anti:#9d174d;
 }
-:root.dark{
-  --bg:#1a1a2e; --surface:#16213e; --elevated:#0f3460;
-  --text:#e0e0e8; --text-muted:#9a9ab0;
-  --accent:#6b9ff2; --accent-hover:#89b4f8; --border:#2a2a4a;
-  --qing:#e09f3e; --ping:#6b9ff2; --yun:#e87aa4;
-  --ok:#38b764; --bad:#e05252; --anti:#e87aa4;
-}
-:root.dark input,:root.dark select,:root.dark button{color-scheme:dark}
-:root.dark .cell input{background:var(--surface);color:var(--text);border-color:var(--border)}
 /* ============================== Base & Typography ====================== */
 *{box-sizing:border-box}
 body{
@@ -121,7 +112,7 @@ select,input{font-family:inherit}
 .cand .zy .neutral{display:block;line-height:.7}   /* 輕聲˙：置頂 */
 .cand .zy .zy-last{position:relative;display:block;line-height:1}            /* 末符號＝注音主體，置中對齊上方各符號 */
 .cand .zy .zy-last .tn{position:absolute;left:100%;top:-.15em;font-size:.82em;line-height:1;margin-left:.02em}  /* 調號：絕對掛右上，不撐版面、不推主體 */
-.cand .badge{position:absolute;top:-6px;right:-6px;font-size:.55rem;background:var(--anti);color:#fff;border-radius:999px;padding:0 .25rem}
+.cand .badge{position:absolute;top:-5px;right:-5px;font-size:.56rem;background:var(--anti);color:#fff;border-radius:999px;padding:.05rem .3rem;box-shadow:0 0 0 2px var(--surface);line-height:1.15;font-weight:500}
 .cand.word{width:auto;min-width:3rem;height:2.6rem;padding:.15rem .3rem;gap:.26rem}
 .cand.word .wch{display:inline-flex;flex-direction:row;align-items:center;gap:.16rem}
 .empty{color:var(--text-muted);font-size:.88rem;padding:1rem 0}
@@ -194,10 +185,6 @@ select,input{font-family:inherit}
       <button class="btn" id="btn-settings" onclick="toggleSettings(event)">設定</button>
       <div class="settings-menu" id="settings-menu" onclick="event.stopPropagation()">
         <div class="srow">
-          <span>深色模式</span>
-          <button class="btn sm" onclick="toggleDark()">切換</button>
-        </div>
-        <div class="srow" style="margin-top:.5rem">
           <span>輕位模式</span>
           <div class="seg" id="lightmode">
             <button data-m="three" class="on" onclick="setLight('three')">三聲</button>
@@ -560,6 +547,8 @@ function renderLookup(){
   let tones=[...toneFilter];if(!tones.length)tones=[1,2,3,4,5];
   let pool=[];tones.forEach(t=>pool=pool.concat(BY_TONE[t]));
   if(tones.length>1)pool.sort((a,b)=>b.f-a.f);
+  const tonesSet=new Set(tones);
+  pool=[...pool.filter(e=>tonesSet.has(e.t)),...pool.filter(e=>!tonesSet.has(e.t))];
 
   const easy=S.lookup==='easy';
   let antiSet=new Set();
@@ -686,18 +675,26 @@ function setBroadRhyme(on){
   document.querySelectorAll('#rhymemode button').forEach(b=>b.classList.toggle('on',b.dataset.m===(on?'broad':'exact')));
   renderPoem();renderLookup();
 }
-// ============================== Example poem ============================
-const EXAMPLE_POEM={poem:[
-  [...'你說我該走開點心已到'],
-  [...'有些好書寫真美多小道'],
-  [...'每天等她把歌給開好報'],
-  [...'想家反身起風找些老照']
-],rhyme:'ㄠ'};
+// ============================== Example poem (random) ====================
 function loadExample(){
   if(S.poem.flat().some(c=>c)&&!confirm('載入範例將覆蓋目前內容，確定？'))return;
-  S.poem=EXAMPLE_POEM.poem.map(r=>[...r]);
+  const t4=BY_TONE[4];
+  const rhymes=[...new Set(t4.slice(0,300).map(e=>e.y))];
+  const ry=rhymes[Math.floor(Math.random()*rhymes.length)];
+  const ryPool=t4.filter(e=>e.y===ry);
+  const pick=(arr,n)=>arr[Math.floor(Math.random()*Math.min(arr.length,n))];
+  const poem=[];
+  for(let l=0;l<LINES;l++){
+    const row=[];
+    for(let p=1;p<=COLS;p++){
+      if(p===10){row.push(pick(ryPool,Math.min(ryPool.length,20)).c);}
+      else{const req=requiredTones(p);let pool=[];req.forEach(t=>pool.push(...BY_TONE[t].slice(0,80)));row.push(pick(pool,pool.length).c);}
+    }
+    poem.push(row);
+  }
+  S.poem=poem;
   S.source=Array.from({length:LINES},()=>Array(COLS).fill('example'));
-  S.rhyme=EXAMPLE_POEM.rhyme;S.light='three';
+  S.rhyme=ry;S.light='three';
   pushHistory();saveState();setLight(S.light);renderPoem();renderLookup();
 }
 function clearPoem(){if(!confirm('清空整首詩？'))return;S.poem=Array.from({length:LINES},()=>Array(COLS).fill(''));S.source=Array.from({length:LINES},()=>Array(COLS).fill(''));S.rhyme='';pushHistory();saveState();active=null;renderPoem();renderLookup();}
@@ -756,17 +753,6 @@ function toggleRead(){
   }
 }
 
-// ============================== Dark mode ===============================
-function initDarkMode(){
-  const saved=localStorage.getItem('tone_verse_dark');
-  const isDark=saved!==null?saved==='true':window.matchMedia('(prefers-color-scheme:dark)').matches;
-  document.documentElement.classList.toggle('dark',isDark);
-}
-function toggleDark(){
-  const isDark=document.documentElement.classList.toggle('dark');
-  localStorage.setItem('tone_verse_dark',isDark);
-}
-initDarkMode();
 
 // ============================== Init ===================================
 function init(){
