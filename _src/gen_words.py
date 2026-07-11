@@ -12,6 +12,7 @@ import json, sys, io, logging
 from collections import Counter
 from wordfreq import top_n_list, zipf_frequency
 from opencc import OpenCC
+from pypinyin import pinyin, Style
 
 logging.getLogger('jieba').setLevel(logging.ERROR)
 import jieba.posseg as pseg
@@ -37,13 +38,29 @@ def flag_to_cat(f):
         return 'a'
     return 'o'
 
-def get_pos(w_simplified):
-    """簡體詞 → 詞性類別 n/v/a/o（jieba，以最多出現的類別為準）"""
+def analyze_word(w_simplified):
+    """簡體詞 → (詞性類別 n/v/a/o, 是否專有名詞)"""
     segs = list(pseg.cut(w_simplified))
     if not segs:
-        return 'o'
+        return 'o', False
     cats = [flag_to_cat(s.flag) for s in segs]
-    return Counter(cats).most_common(1)[0][0]
+    pos = Counter(cats).most_common(1)[0][0]
+    pn = any(s.flag in ('nr', 'ns', 'nt', 'nrt', 'nz') for s in segs)
+    return pos, pn
+
+def get_word_tones(w_simplified):
+    """用 pypinyin 詞組模式取每字聲調（比查單字主讀更準：假期→[4,1] 而非 [3,1]）"""
+    py = pinyin(w_simplified, style=Style.TONE3, heteronym=False)
+    if len(py) != len(w_simplified):
+        return None
+    tones = []
+    for syllable in py:
+        s = syllable[0]
+        if s and s[-1].isdigit():
+            tones.append(int(s[-1]))
+        else:
+            tones.append(5)
+    return tones
 
 seen = set()
 words = []           # [(f, w0_simplified, w_traditional)]
@@ -66,8 +83,14 @@ words.sort(key=lambda x: -x[0])
 print('標詞性中（jieba）…')
 word_list = []
 for _, w0, w in words:
-    p = get_pos(w0)
-    word_list.append({'w': w, 'p': p})
+    p, pn = analyze_word(w0)
+    t = get_word_tones(w0)
+    entry = {'w': w, 'p': p}
+    if t and len(t) == len(w):
+        entry['t'] = t
+    if pn:
+        entry['pn'] = 1
+    word_list.append(entry)
 
 out = {
     'meta': {

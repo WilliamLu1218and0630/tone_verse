@@ -132,7 +132,9 @@ select,input{font-family:inherit}
   border-radius:8px;padding:3rem;margin-bottom:1rem;
 }
 .poem-read.show{display:block}
-.line-text{font-size:2rem;line-height:2;letter-spacing:.2em;color:var(--text)}
+.line-text{display:flex;flex-wrap:nowrap;gap:0 .2em;font-size:2rem;color:var(--text);overflow-x:auto}
+.line-text span{display:inline-flex;flex-direction:row;align-items:flex-start;line-height:1.3}
+.line-text span[data-zy]::after{content:attr(data-zy);writing-mode:vertical-rl;font-size:.38em;color:var(--text-muted);line-height:1;margin-left:.08em;letter-spacing:.03em}
 .read-hint{font-size:.78rem;color:var(--text-muted);margin-top:1.5rem}
 .stat-line{font-size:.74rem;color:var(--text-muted);margin-top:.4rem}
 /* ============================== Mobile / 行動版 ===================== */
@@ -161,7 +163,7 @@ select,input{font-family:inherit}
   .cands{max-height:46vh}
   /* 清讀模式 */
   .poem-read{padding:1.4rem 1.1rem}
-  .line-text{font-size:1.5rem;letter-spacing:.12em;line-height:1.85;white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .line-text{font-size:1.5rem}
   .read-hint{margin-top:1rem}
 }
 @media(max-width:400px){
@@ -169,7 +171,7 @@ select,input{font-family:inherit}
   .line-no{width:.8rem;font-size:.58rem;padding-top:.55rem}
   .cell input{width:1.55rem;height:1.55rem;font-size:.92rem}
   .cell .tag{font-size:.46rem}
-  .line-text{font-size:1.25rem;letter-spacing:.08em}
+  .line-text{font-size:1.25rem}
 }
 </style>
 </head>
@@ -332,6 +334,8 @@ const EMB=(function(){
 const _WD=(function(){try{return JSON.parse(document.getElementById('words').textContent);}catch(e){return{};}})();
 const WORDS=(function(){const r=_WD.words||[];if(!r.length||typeof r[0]==='string')return r;return r.map(x=>x.w);})();
 const WORD_POS=(function(){const r=_WD.words||[];if(!r.length||typeof r[0]==='string')return new Map();const m=new Map();r.forEach(x=>m.set(x.w,x.p));return m;})();
+const WORD_TONES=(function(){const r=_WD.words||[];const m=new Map();r.forEach(x=>{if(x.t)m.set(x.w,x.t);});return m;})();
+const _PN=new Set();(_WD.words||[]).forEach(x=>{if(x.pn)_PN.add(x.w);});
 
 // ============================== State =================================
 function defaultState(){return{poem:Array.from({length:LINES},()=>Array(COLS).fill('')),source:Array.from({length:LINES},()=>Array(COLS).fill('')),light:'three',rhyme:'',lookup:'pro',broadRhyme:false};}
@@ -371,6 +375,7 @@ function requiredTones(pos){
 function posClass(pos){return pos===10?'t-yun':(pos%2===0?'t-ping':'t-qing');}
 function posTag(pos){return pos===10?'韻':(pos%2===0?'平':'輕');}
 function validateChar(ch,pos){if(!ch)return'';if(!IDX.has(ch))return'unknown';const tones=ALL_TONES.get(ch);return requiredTones(pos).some(t=>tones&&tones.has(t))?'ok':'bad';}
+function readingFor(ch,pos){const ci=IDX.get(ch);if(ci===undefined)return'';const e=CHARS[ci];const req=requiredTones(pos);if(req.some(t=>t===e.t))return e.z;if(e.alts){const a=e.alts.find(a=>req.some(t=>t===a.t));if(a)return a.z;}return e.z;}
 
 // ============================== Poem render ===========================
 function renderPoem(){
@@ -675,20 +680,60 @@ function setBroadRhyme(on){
   document.querySelectorAll('#rhymemode button').forEach(b=>b.classList.toggle('on',b.dataset.m===(on?'broad':'exact')));
   renderPoem();renderLookup();
 }
-// ============================== Example poem (random) ====================
+// ============================== Example poem (word-based) ================
+let _WP=null;
+function getWP(){
+  if(_WP)return _WP;
+  _WP=new Map();
+  const N=WORDS.length;
+  for(let i=0;i<N;i++){
+    const w=WORDS[i];const ch=[...w];
+    if(ch.length<2||ch.length>3)continue;
+    const wt=WORD_TONES.get(w);
+    if(!wt||wt.length!==ch.length)continue;
+    if(ch.some(c=>!IDX.has(c)))continue;
+    if(_PN.has(w))continue;
+    const y=CHARS[IDX.get(ch[ch.length-1])].y;
+    const k=wt.join(',');
+    if(!_WP.has(k))_WP.set(k,[]);
+    _WP.get(k).push({w,y});
+  }
+  return _WP;
+}
 function loadExample(){
   if(S.poem.flat().some(c=>c)&&!confirm('載入範例將覆蓋目前內容，確定？'))return;
+  const wp=getWP();
   const t4=BY_TONE[4];
   const rhymes=[...new Set(t4.slice(0,300).map(e=>e.y))];
   const ry=rhymes[Math.floor(Math.random()*rhymes.length)];
-  const ryPool=t4.filter(e=>e.y===ry);
+  const ryPool=t4.filter(e=>e.t===4&&e.y===ry);
   const pick=(arr,n)=>arr[Math.floor(Math.random()*Math.min(arr.length,n))];
+  const exTone=p=>p===10?[4]:p%2===0?[1]:[3];
+  const used=new Set(),usedC=new Set();
   const poem=[];
   for(let l=0;l<LINES;l++){
-    const row=[];
-    for(let p=1;p<=COLS;p++){
-      if(p===10){row.push(pick(ryPool,Math.min(ryPool.length,20)).c);}
-      else{const req=requiredTones(p);let pool=[];req.forEach(t=>pool.push(...BY_TONE[t].slice(0,80)));row.push(pick(pool,pool.length).c);}
+    const row=[];let p=1;
+    while(p<=COLS){
+      if(p===10){const ra=ryPool.filter(e=>!usedC.has(e.c));const c=(ra.length?pick(ra,Math.min(ra.length,20)):pick(ryPool,Math.min(ryPool.length,20))).c;row.push(c);usedC.add(c);p++;continue;}
+      let placed=false;
+      const remain=COLS-p+1;
+      const tryLens=remain>=3&&Math.random()<0.4?[3,2]:[2,3];
+      for(const wlen of tryLens){
+        if(wlen>remain)continue;
+        const tones=[];for(let j=0;j<wlen;j++)tones.push(exTone(p+j)[0]);
+        const key=tones.join(',');
+        const pool=wp.get(key);if(!pool||!pool.length)continue;
+        let cands=p+wlen-1===10?pool.filter(e=>e.y===ry):pool;
+        cands=cands.filter(e=>!used.has(e.w)&&![...e.w].some(c=>usedC.has(c)));
+        if(!cands.length)continue;
+        const e=cands[Math.floor(Math.random()*cands.length)];
+        [...e.w].forEach(c=>{row.push(c);usedC.add(c);});used.add(e.w);p+=wlen;placed=true;break;
+      }
+      if(!placed){
+        const req=exTone(p);let pool=[];req.forEach(t=>pool.push(...BY_TONE[t].filter(e=>e.t===t&&!usedC.has(e.c)).slice(0,80)));
+        if(!pool.length)req.forEach(t=>pool.push(...BY_TONE[t].filter(e=>e.t===t).slice(0,80)));
+        const c=pick(pool,pool.length).c;row.push(c);usedC.add(c);p++;
+      }
     }
     poem.push(row);
   }
@@ -741,9 +786,10 @@ function toggleRead(){
   const btn=document.getElementById('btn-read');
   if(readMode){
     pr.innerHTML='';
-    S.poem.forEach(row=>{
+    S.poem.forEach((row,l)=>{
       const d=document.createElement('div');d.className='line-text';
-      d.textContent=row.map(c=>c||'　').join('');pr.appendChild(d);
+      row.forEach((c,i)=>{const sp=document.createElement('span');sp.textContent=c||'　';if(c&&IDX.has(c))sp.dataset.zy=readingFor(c,i+1);d.appendChild(sp);});
+      pr.appendChild(d);
     });
     const h=document.createElement('div');h.className='read-hint';
     h.textContent='點「編輯」回到格子模式';pr.appendChild(h);
